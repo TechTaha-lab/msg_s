@@ -12,6 +12,8 @@ const Chat = () => {
   const [userProfiles, setUserProfiles] = useState([]);
   const [messages, setMessages] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     const data = localStorage.getItem("userInfo");
@@ -21,6 +23,7 @@ const Chat = () => {
     }
     const userdata = JSON.parse(data);
     const userid = userdata.user.id;
+    setUserId(userdata.user.id);
 
     const fetchProfile = async () => {
       try {
@@ -40,8 +43,7 @@ const Chat = () => {
       try {
         const response = await fetch(`${apiURL}/profile`);
         const data = await response.json();
-        const filteredProfiles = data.profiles.filter(profile => profile.user_id !== userid);
-        setUserProfiles(filteredProfiles);
+        setUserProfiles(data.profiles.filter(profile => profile.user_id !== userid));
       } catch (error) {
         console.log(error);
       }
@@ -51,18 +53,50 @@ const Chat = () => {
     fetchUserProfiles();
   }, [navigate]);
 
-  const handleSend = () => {
-    if (message.trim() !== '') {
-      setMessages([...messages, { sender: 'You', text: message, time: 'Now' }]);
-      setMessage('');
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    fetchMessageByReceiver(user.user_id);
+  };
+
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const fetchMessageByReceiver = async (receiverId) => {
+    try {
+      const response = await fetch(`${apiURL}/get_msg/${receiverId}`);
+      const data = await response.json();
+      setMessages(data.messages || []);
+    } catch (error) {
+      console.log(error);
     }
   };
 
-  const handleProfileClick = (userId) => {
-    if (profile) {
-      console.log(userId);
+  const handlesend = async () => {
+    if (!selectedUser || !message.trim()) {
+      alert("Please select a user and enter a message.");
+      return;
+    }
 
-      navigate(`/UserProfile/${userId}`);
+    const formData = new FormData();
+    formData.append("sender_id", userId);
+    formData.append("receiver_id", selectedUser.user_id);
+    formData.append("message", message);
+
+    if (selectedFile) {
+      formData.append("file", selectedFile);
+    }
+
+    try {
+      await fetch(`${apiURL}/send_msg`, {
+        method: "POST",
+        body: formData,
+      });
+      setMessage('');
+      setSelectedFile(null);
+      fetchMessageByReceiver(selectedUser.user_id);
+    } catch (error) {
+      console.log(error);
     }
   };
 
@@ -74,15 +108,11 @@ const Chat = () => {
           <div className="row g-0">
             <div className="col-12 col-lg-5 col-xl-3 border-right user-list">
               <div className="px-4 d-none d-md-block">
-                <div className="d-flex align-items-center">
-                  <div className="flex-grow-1">
-                    <input type="text" className="form-control my-3" placeholder="Search..." />
-                  </div>
-                </div>
+                <input type="text" className="form-control my-3" placeholder="Search..." />
               </div>
               <div className="user-scroll">
                 {userProfiles.map((user) => (
-                  <a key={user.id} href="" className="list-group-item list-group-item-action border-0 p-2 pl-3" onClick={() => setSelectedUser(user)}>
+                  <a key={user.id} href="#" className="list-group-item list-group-item-action border-0 p-2 pl-3" onClick={() => handleSelectUser(user)}>
                     <div className="d-flex align-items-start">
                       <img src={user.image || "https://bootdey.com/img/Content/avatar/avatar5.png"} className="rounded-circle mr-1" alt={user.name} width="40" height="40" />
                       <div className="flex-grow-1 ml-4">
@@ -99,30 +129,21 @@ const Chat = () => {
                 <>
                   <div className="py-2 px-4 border-bottom d-none d-lg-block">
                     <div className="d-flex align-items-center py-1">
-                      <div className="position-relative">
-                        <img src={selectedUser.image || "https://bootdey.com/img/Content/avatar/avatar3.png"} className="rounded-circle mr-1" alt={selectedUser.name} width="40" height="40" />
-                      </div>
+                      <img src={selectedUser.image || "https://bootdey.com/img/Content/avatar/avatar3.png"} className="rounded-circle mr-1" alt={selectedUser.name} width="40" height="40" />
                       <div className="flex-grow-1 pl-3">
                         <strong>{selectedUser.name}</strong>
-                        <div className="text-muted small"><em>Online</em></div>
-                      </div>
-                      <div>
-                        <i className="fas fa-user-circle" style={{ fontSize: "22px", cursor: "pointer", color: "#333" }} onClick={handleProfileClick(selectedUser.user_id)}></i>
-
                       </div>
                     </div>
                   </div>
                   <div className="position-relative chat-box">
                     <div className="chat-messages p-4">
                       {messages.map((msg, index) => (
-                        <div key={index} className={`chat-message-${msg.sender === 'You' ? 'right' : 'left'} pb-4`}>
-                          <div>
-                            <img src={`https://bootdey.com/img/Content/avatar/${msg.sender === 'You' ? 'avatar1.png' : 'avatar3.png'}`} className="rounded-circle mr-1" alt={msg.sender} width="40" height="40" />
-                            <div className="text-muted small text-nowrap mt-2">{msg.time}</div>
-                          </div>
-                          <div className="flex-shrink-1 bg-light rounded py-2 px-3 mr-3">
-                            <div className="font-weight-bold mb-1">{msg.sender}</div>
-                            {msg.text}
+                        <div key={index} className={`d-flex mb-3 ${msg.sender_id === userId ? 'justify-content-end' : 'justify-content-start'}`}>
+                          <div className="d-flex">
+                            <img src={msg.sender_id === userId ? profile.image : selectedUser.image || "https://bootdey.com/img/Content/avatar/avatar3.png"} className="rounded-circle mr-2" alt="User" width="40" height="40" />
+                            <div className={`chat-bubble p-2 rounded ${msg.sender_id === userId ? 'bg-primary text-white' : 'bg-light text-dark'}`} style={{ maxWidth: '60%' }}>
+                              <p className="mb-0">{msg.message}</p>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -135,9 +156,9 @@ const Chat = () => {
                         <label htmlFor='files' style={{ cursor: "pointer" }}>
                           <i className="fas fa-file" id='files'></i>
                         </label>
-                        <input type="file" id='files' style={{ display: "none" }} />
+                        <input type="file" id='files' style={{ display: "none" }} onChange={handleFileChange} />
                       </button>
-                      <button className="btn btn-primary" onClick={handleSend(selectedUser.user_id)}>Send</button>
+                      <button className="btn btn-primary" onClick={handlesend}>Send</button>
                     </div>
                   </div>
                 </>
@@ -158,28 +179,7 @@ const Chat = () => {
                 )}
                 <button className="btn btn-danger" onClick={logout}>Logout</button>
               </div>
-              <hr />
-              <div className="profile">
-                <div className="profile-details">
-                  <p>Media</p>
-                </div>
-                <div className="media-gallery" style={{ overflowX: 'auto', overflowY: 'hidden', display: 'flex', gap: '10px', scrollbarWidth: 'none' }}>
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="Media 1" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="Media 2" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                  <img src="http://localhost:8000/storage/messages/VJFnbgCUS7YjzsuzLXTlgJhw0DzcCbhS6kXz14c9.jpg" alt="" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px' }} />
-                </div>
-              </div>
-
-
-
-
             </div>
-
-
-
           </div>
         </div>
       </div>

@@ -22,4 +22,6 @@ route::get('/profile/{id}',[ProfileController::class,'get_profile_by_user_id']);
 
 route::post('/send_msg',[MsgController::class,'send_msg']);
 
-route::get('/get_msg/{id}',[MsgController::class,'get_msg']);
+route::get('/get_msg/{id}',[MsgController::class,'get_msg_by_receiver']);
+route::get('/get_msg_s/{id}',[MsgController::class,'get_msg_by_sender']);
+route::get('/get_media/{id}',[MsgController::class,'get_media']);
