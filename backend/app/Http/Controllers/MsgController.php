@@ -38,7 +38,8 @@ class MsgController extends Controller
 
     public function get_msg_by_receiver($receiver_id)
     {
-        $msg = Msg::where('receiver_id', $receiver_id)->first();
+        $msg = Msg::where('receiver_id', $receiver_id)->get();
+
 
         if ($msg) {
             return response()->json(['status' => 200, 'data' => $msg], 200);
@@ -47,12 +48,14 @@ class MsgController extends Controller
         }
     }
 
-    public function get_media($receiver_id)
+    public function get_media($sender_id)
     {
-        $messages = Msg::where('receiver_id', $receiver_id)->whereNotNull('file')->get();
+        $messages = Msg::where('sender_id', $sender_id)
+            ->whereNotNull('file')
+            ->get();
 
         if ($messages->isEmpty()) {
-            return response()->json(['status' => 404, 'message' => 'No media found for this receiver.'], 404);
+            return response()->json(['status' => 404, 'message' => 'No media found.'], 404);
         }
 
         $mediaFiles = $messages->pluck('file');
@@ -70,4 +73,20 @@ class MsgController extends Controller
             return response()->json(['status' => 404, 'message' => 'Messages not found'], 404);
         }
     }
+    public function get_last_message($sender_id)
+    {
+        $message = Msg::where('sender_id', $sender_id)
+        ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($message) {
+            return response()->json(['status' => 200, 'data' => $message], 200);
+        } else {
+            return response()->json(['status' => 404, 'message' => 'No messages found'], 404);
+        }
+    }
+
+
+
+
 }
